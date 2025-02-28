@@ -8,3 +8,5 @@ mod protocol;
 pub mod sync;
 #[cfg(feature = "tokio")]
 pub mod tokio;
+
+pub use crate::protocol::IpAddrIterator;

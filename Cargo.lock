@@ -239,7 +239,7 @@ dependencies = [
 
 [[package]]
 name = "nscd-lookup"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "bytemuck",
  "displaydoc",
@@ -250,7 +250,7 @@ dependencies = [
 
 [[package]]
 name = "nscd-lookup-sync"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "clap",
  "nscd-lookup",
@@ -259,7 +259,7 @@ dependencies = [
 
 [[package]]
 name = "nscd-lookup-tokio"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "clap",
  "nscd-lookup",

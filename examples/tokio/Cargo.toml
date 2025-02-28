@@ -1,6 +1,6 @@
 [package]
 name = "nscd-lookup-tokio"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 rust-version = "1.81"
 license = "MIT OR Apache-2.0"
@@ -9,6 +9,6 @@ publish = false
 
 [dependencies]
 clap = { version = "4.5.31", features = ["derive"] }
-nscd-lookup = { version = "0.1.0", path = "../..", features = ["tokio"] }
+nscd-lookup = { version = "0.1.1", path = "../..", features = ["tokio"] }
 pretty-error-debug = { version = "0.3.0", default-features = false }
 tokio = { version = "1.43.0", default-features = false, features = ["macros", "rt"] }

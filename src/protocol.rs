@@ -180,7 +180,7 @@ pub enum DataError {
     DataLength { actual: usize, expected: usize },
 }
 
-/// An iterator of [`IpAddr`]esses, returned by [`lookup()`].
+/// An iterator of [`IpAddr`]esses, returned by [`lookup()`][crate::sync::lookup].
 #[derive(Debug, Default, Clone, Copy)]
 pub struct IpAddrIterator<'a> {
     families: &'a [Family],
