@@ -5,6 +5,10 @@ edition = "2021"
 rust-version = "1.81"
 license = "MIT OR Apache-2.0"
 authors = ["René Kijewski <crates.io@k6i.de>"]
+repository = "https://github.com/Kijewski/nscd-lookup"
+description = "Look up IP addresses using nscd"
+categories = ["network-programming", "os::unix-apis"]
+keywords = ["nscd", "dns", "lookup", "synchronous", "tokio"]
 
 [package.metadata.docs.rs]
 all-features = true
@@ -12,3 +16,51 @@ rustdoc-args = ["--generate-link-to-definition", "--cfg=docsrs"]
 
 [dependencies]
 bytemuck = { version = "1.21.0", features = ["derive"] }
+displaydoc = "0.2.5"
+rustix = { version = "0.38.44", features = ["event", "net"] }
+thiserror = "2.0.11"
+
+tokio = { version = "1.43.0", default-features = false, features = ["net", "time"], optional = true }
+
+[features]
+default = []
+tokio = ["dep:tokio"]
+
+[lints.rust]
+unknown_lints = { level = "allow", priority = -1 }
+unsafe_code = { level = "forbid", priority = -1 }
+
+absolute_paths_not_starting_with_crate = "warn"
+elided_lifetimes_in_paths = "warn"
+explicit_outlives_requirements = "warn"
+meta_variable_misuse = "warn"
+missing_copy_implementations = "warn"
+missing_debug_implementations = "warn"
+missing_docs = "warn"
+non_ascii_idents = "warn"
+noop_method_call = "warn"
+single_use_lifetimes = "warn"
+trivial_casts = "warn"
+unreachable_pub = "warn"
+unused_crate_dependencies = "warn"
+warnings = "warn"
+
+[lints.clippy]
+collapsible_match = "warn"
+expect_used = "warn"
+match_bool = "warn"
+match_ref_pats = "warn"
+match_same_arms = "warn"
+match_single_binding = "warn"
+needless_bool = "deny"
+needless_late_init = "warn"
+needless_match = "warn"
+redundant_guards = "warn"
+redundant_pattern = "warn"
+redundant_pattern_matching = "warn"
+single_match = "warn"
+single_match_else = "warn"
+# unwrap_used = "warn"
+
+[workspace]
+members = [".", "examples/sync", "examples/tokio"]
