@@ -266,19 +266,16 @@ fn write_all(
                 Ok(ControlFlow::Break(()))
             } else {
                 state.pos += n;
-                state.had_zero = true;
-                state.had_intr = true;
+                state.had_zero = false;
+                state.had_intr = false;
                 Ok(ControlFlow::Continue(()))
             }
         }
-        Ok(_) => {
-            if state.had_zero {
-                Err(WriteError(None))
-            } else {
-                state.had_zero = true;
-                Ok(ControlFlow::Continue(()))
-            }
+        Ok(_) if !state.had_zero => {
+            state.had_zero = true;
+            Ok(ControlFlow::Continue(()))
         }
+        Ok(_) => Err(WriteError(None)),
         Err(Errno::INTR) if !state.had_intr => {
             state.had_intr = true;
             Ok(ControlFlow::Continue(()))
@@ -307,19 +304,16 @@ fn read_all(
                 Ok(ControlFlow::Break(()))
             } else {
                 state.pos += n;
-                state.had_zero = true;
-                state.had_intr = true;
+                state.had_zero = false;
+                state.had_intr = false;
                 Ok(ControlFlow::Continue(()))
             }
         }
-        Ok(_) => {
-            if state.had_zero {
-                Err(ReadError(None))
-            } else {
-                state.had_zero = true;
-                Ok(ControlFlow::Continue(()))
-            }
+        Ok(_) if !state.had_zero => {
+            state.had_zero = true;
+            Ok(ControlFlow::Continue(()))
         }
+        Ok(_) => Err(ReadError(None)),
         Err(Errno::INTR) if !state.had_intr => {
             state.had_intr = true;
             Ok(ControlFlow::Continue(()))
