@@ -36,3 +36,5 @@ let localhost: Vec<IpAddr> = lookup("localhost", &mut Vec::new(), None)
 assert!(localhost.contains(&IpAddr::V4(Ipv4Addr::LOCALHOST)));
 assert!(localhost.contains(&IpAddr::V6(Ipv6Addr::LOCALHOST)));
 ```
+
+The feature `"reqwest"` enables a resolver that can be used in reqwest clients.

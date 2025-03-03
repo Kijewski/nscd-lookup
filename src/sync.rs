@@ -12,7 +12,7 @@ use crate::protocol::{
     SocketError, connect, interpret_data, read_data, read_header, write_request,
 };
 
-/// Look up a host name, synchronously
+/// Look up a host name, synchronously.
 ///
 /// This function looks up `host` using [nscd](https://man7.org/linux/man-pages/man8/nscd.8.html),
 /// stores the response in `buf`, and returns an iterator over the data.
@@ -28,7 +28,6 @@ pub fn lookup(
     do_lookup(host.as_ref(), buf, timeout.unwrap_or(DEFAULT_TIMEOUT))
 }
 
-#[allow(clippy::ptr_arg)] // false positive
 fn do_lookup<'a>(
     host: &[u8],
     buf: &'a mut Vec<u8>,

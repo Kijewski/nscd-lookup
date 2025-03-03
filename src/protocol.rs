@@ -118,10 +118,10 @@ pub(crate) fn read_data(
 
 pub(crate) fn interpret_data<'a>(
     resp: &AiResponseHeader,
-    buf: &'a mut [u8],
+    buf: &'a [u8],
 ) -> Result<IpAddrIterator<'a>, DataError> {
     // read canonical name
-    let slice = &*buf;
+    let slice = buf;
     let (slice, canon) = if resp.canonlen != 0 {
         match slice
             .len()

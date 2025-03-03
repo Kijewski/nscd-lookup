@@ -5,6 +5,8 @@
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
 mod protocol;
+#[cfg(feature = "reqwest")]
+pub mod reqwest;
 pub mod sync;
 #[cfg(feature = "tokio")]
 pub mod tokio;

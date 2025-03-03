@@ -17,7 +17,7 @@ use crate::protocol::{
 pub use crate::sync::DEFAULT_TIMEOUT;
 use crate::sync::Error as SyncError;
 
-/// Look up a host name, asynchronously
+/// Look up a host name, asynchronously.
 ///
 /// This function looks up `host` using [nscd](https://man7.org/linux/man-pages/man8/nscd.8.html),
 /// stores the response in `buf`, and returns an iterator over the data.
@@ -36,11 +36,22 @@ pub async fn lookup(
         .map_err(|_| Error::Sync(SyncError::Timeout(None)))?
 }
 
-#[allow(clippy::ptr_arg)] // false positive
 async fn do_lookup<'a>(
     host: &[u8],
     buf: &'a mut Vec<u8>,
 ) -> Result<Option<IpAddrIterator<'a>>, Error> {
+    if let Some(resp) = fill_buf(host, buf).await? {
+        let iter = interpret_data(&resp, buf).map_err(|err| Error::Sync(SyncError::Data(err)))?;
+        Ok(Some(iter))
+    } else {
+        Ok(None)
+    }
+}
+
+pub(crate) async fn fill_buf(
+    host: &[u8],
+    buf: &mut Vec<u8>,
+) -> Result<Option<AiResponseHeader>, Error> {
     let sock = connect().map_err(|err| Error::Sync(SyncError::Socket(err)))?;
     let sock = AsyncFd::new(sock.as_fd()).map_err(Error::New)?;
 
@@ -79,9 +90,7 @@ async fn do_lookup<'a>(
         continue;
     }
 
-    Ok(Some(
-        interpret_data(&resp, buf).map_err(|err| Error::Sync(SyncError::Data(err)))?,
-    ))
+    Ok(Some(resp))
 }
 
 async fn try_io<T, E, F>(
