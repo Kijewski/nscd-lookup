@@ -1,6 +1,6 @@
 [package]
 name = "nscd-lookup-reqwest"
-version = "0.1.2"
+version = "0.1.4"
 edition = "2021"
 rust-version = "1.81"
 license = "MIT OR Apache-2.0"
@@ -10,7 +10,7 @@ publish = false
 [dependencies]
 clap = { version = "4.5.31", features = ["derive"] }
 displaydoc = "0.2.5"
-nscd-lookup = { version = "0.1.2", path = "../..", features = ["reqwest"] }
+nscd-lookup = { version = "0.1.4", path = "../..", features = ["reqwest"] }
 pretty-error-debug = "0.3.0"
 reqwest = "0.12.12"
 thiserror = "2.0.12"

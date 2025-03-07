@@ -4,12 +4,12 @@ use std::ops::ControlFlow;
 use std::os::fd::{AsFd, OwnedFd};
 use std::time::{Duration, Instant};
 
-use rustix::event::{PollFd, PollFlags, poll};
+use rustix::event::{PollFd, PollFlags, Timespec, poll};
 use rustix::io::Errno;
 
 use crate::protocol::{
     AiResponseHeader, DataError, HeaderError, IoState, IpAddrIterator, IsEmpty, RequestError,
-    SocketError, connect, interpret_data, read_data, read_header, write_request,
+    SocketError, interpret_data, open_socket, read_data, read_header, write_request,
 };
 
 /// Look up a host name, synchronously.
@@ -35,11 +35,14 @@ fn do_lookup<'a>(
 ) -> Result<Option<IpAddrIterator<'a>>, Error> {
     let deadline = Instant::now() + timeout;
 
-    let sock = connect().map_err(Error::Socket)?;
+    let sock = open_socket().map_err(Error::Socket)?;
 
     let mut io = IoState::default();
-    while write_request(false, sock.as_fd(), &mut io, host)?.is_continue() {
-        continue;
+    loop {
+        await_writable(&sock, deadline)?;
+        if write_request(sock.as_fd(), &mut io, host)?.is_break() {
+            break;
+        }
     }
 
     io = IoState::default();
@@ -65,17 +68,32 @@ fn do_lookup<'a>(
     Ok(Some(interpret_data(&resp, buf)?))
 }
 
+fn await_writable(sock: &OwnedFd, deadline: Instant) -> Result<(), Error> {
+    let Some(remaining) = deadline.checked_duration_since(Instant::now()) else {
+        return Err(Error::Timeout(None));
+    };
+
+    let timeout = Timespec::try_from(remaining).map_err(|_| Error::Timeout(None))?;
+    let events = PollFlags::IN
+        | PollFlags::OUT
+        | PollFlags::WRNORM
+        | PollFlags::WRBAND
+        | PollFlags::ERR
+        | PollFlags::HUP;
+    let mut fds = [PollFd::new(sock, events)];
+    if poll(&mut fds, Some(&timeout)).map_err(|err| Error::Timeout(Some(err)))? == 0 {
+        return Err(Error::Timeout(None));
+    }
+
+    Ok(())
+}
+
 fn await_readable(sock: &OwnedFd, deadline: Instant) -> Result<(), Error> {
     let Some(remaining) = deadline.checked_duration_since(Instant::now()) else {
         return Err(Error::Timeout(None));
     };
 
-    let millis = remaining.subsec_nanos().div_ceil(1_000_000);
-    let millis = remaining
-        .as_secs()
-        .saturating_mul(1_000)
-        .saturating_add(millis as u64)
-        .clamp(1, i32::MAX as u64) as i32;
+    let timeout = Timespec::try_from(remaining).map_err(|_| Error::Timeout(None))?;
     let events = PollFlags::IN
         | PollFlags::PRI
         | PollFlags::RDNORM
@@ -83,7 +101,7 @@ fn await_readable(sock: &OwnedFd, deadline: Instant) -> Result<(), Error> {
         | PollFlags::ERR
         | PollFlags::HUP;
     let mut fds = [PollFd::new(sock, events)];
-    if poll(&mut fds, millis).map_err(|err| Error::Timeout(Some(err)))? == 0 {
+    if poll(&mut fds, Some(&timeout)).map_err(|err| Error::Timeout(Some(err)))? == 0 {
         return Err(Error::Timeout(None));
     }
 

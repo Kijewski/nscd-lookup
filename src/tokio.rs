@@ -12,7 +12,7 @@ use tokio::io::unix::AsyncFd;
 
 use crate::protocol::{
     AiResponseHeader, DataError, HeaderError, IoState, IpAddrIterator, IsEmpty, ReadError,
-    RequestError, WriteError, connect, interpret_data, read_data, read_header, write_request,
+    RequestError, WriteError, interpret_data, open_socket, read_data, read_header, write_request,
 };
 pub use crate::sync::DEFAULT_TIMEOUT;
 use crate::sync::Error as SyncError;
@@ -52,12 +52,12 @@ pub(crate) async fn fill_buf(
     host: &[u8],
     buf: &mut Vec<u8>,
 ) -> Result<Option<AiResponseHeader>, Error> {
-    let sock = connect().map_err(|err| Error::Sync(SyncError::Socket(err)))?;
+    let sock = open_socket().map_err(|err| Error::Sync(SyncError::Socket(err)))?;
     let sock = AsyncFd::new(sock.as_fd()).map_err(Error::New)?;
 
     let mut io = IoState::default();
     while try_io(&sock, Interest::WRITABLE, |sock: BorrowedFd<'_>| {
-        write_request(true, sock, &mut io, host)
+        write_request(sock, &mut io, host)
     })
     .await?
     .is_continue()

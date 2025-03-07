@@ -9,10 +9,10 @@ use bytemuck::checked::try_cast_slice;
 use bytemuck::{CheckedBitPattern, Pod, Zeroable, bytes_of, bytes_of_mut};
 use rustix::io::{Errno, ReadWriteFlags, preadv2, pwritev2};
 use rustix::net::{
-    AddressFamily, SocketAddrUnix, SocketFlags, SocketType, connect_unix, socket_with,
+    AddressFamily, SocketAddrUnix, SocketFlags, SocketType, bind, connect, socket_with,
 };
 
-pub(crate) fn connect() -> Result<OwnedFd, SocketError> {
+pub(crate) fn open_socket() -> Result<OwnedFd, SocketError> {
     let addr = SocketAddrUnix::new(PATH_NSCDSOCKET).map_err(|_| SocketError::Addr)?;
     let sock = socket_with(
         AddressFamily::UNIX,
@@ -21,7 +21,8 @@ pub(crate) fn connect() -> Result<OwnedFd, SocketError> {
         None,
     )
     .map_err(SocketError::Open)?;
-    connect_unix(&sock, &addr).map_err(SocketError::Connect)?;
+    bind(&sock, &SocketAddrUnix::new_unnamed()).map_err(SocketError::Bind)?;
+    connect(&sock, &addr).map_err(SocketError::Connect)?;
     Ok(sock)
 }
 
@@ -31,12 +32,13 @@ pub enum SocketError {
     Open(#[source] Errno),
     /// Nscd socket address was invalid
     Addr,
+    /// Could not bind anonymous socket
+    Bind(#[source] Errno),
     /// Could not connect to nscd socket
     Connect(#[source] Errno),
 }
 
 pub(crate) fn write_request(
-    nowait: bool,
     sock: BorrowedFd<'_>,
     io: &mut IoState,
     host: &[u8],
@@ -48,7 +50,7 @@ pub(crate) fn write_request(
     };
 
     let mut slices = [IoSlice::new(bytes_of(&req)), IoSlice::new(host)];
-    write_all(nowait, sock, io, &mut slices).map_err(RequestError::Write)
+    write_all(sock, io, &mut slices).map_err(RequestError::Write)
 }
 
 #[derive(Debug, Clone, Copy, thiserror::Error, displaydoc::Display)]
@@ -245,7 +247,6 @@ pub(crate) enum Family {
 }
 
 fn write_all(
-    nowait: bool,
     sock: BorrowedFd<'_>,
     state: &mut IoState,
     mut slices: &mut [IoSlice<'_>],
@@ -254,12 +255,7 @@ fn write_all(
         IoSlice::advance_slices(&mut slices, state.pos);
     }
 
-    let flags = if nowait {
-        ReadWriteFlags::NOWAIT
-    } else {
-        ReadWriteFlags::empty()
-    };
-    match pwritev2(sock, slices, u64::MAX, flags) {
+    match pwritev2(sock, slices, u64::MAX, ReadWriteFlags::NOWAIT) {
         Ok(n) if n > 0 => {
             IoSlice::advance_slices(&mut slices, n);
             if slices.is_empty() {

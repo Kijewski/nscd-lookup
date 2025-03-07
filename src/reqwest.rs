@@ -17,8 +17,7 @@ pub fn resolver() -> Arc<Resolver> {
     Arc::clone(RESOLVER.get_or_init(|| Arc::new(Resolver)))
 }
 
-/// Use [`resolver()`].
-#[doc(hidden)]
+/// An empty struct that implements [`Resolve`]; use [`resolver()`] instead.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Resolver;
 
