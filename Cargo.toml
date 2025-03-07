@@ -17,7 +17,7 @@ rustdoc-args = ["--generate-link-to-definition", "--cfg=docsrs"]
 [dependencies]
 bytemuck = { version = "1.0.0", features = ["derive"] }
 displaydoc = "0.2.0"
-rustix = { version = "0.38.0", features = ["event", "net"] }
+rustix = { version = "1.0.0", features = ["event", "net"] }
 thiserror = "2.0.0"
 
 ouroboros = { version = "0.18.0", optional = true }
