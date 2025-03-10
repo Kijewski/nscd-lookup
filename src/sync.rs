@@ -8,8 +8,9 @@ use rustix::event::{PollFd, PollFlags, Timespec, poll};
 use rustix::io::Errno;
 
 use crate::protocol::{
-    AiResponseHeader, DataError, HeaderError, IoState, IpAddrIterator, IsEmpty, RequestError,
-    SocketError, interpret_data, open_socket, read_data, read_header, write_request,
+    AiResponseHeader, DataError, HeaderError, IoState, IpAddrIterator, IsEmpty, ReadError,
+    RequestError, SocketError, WriteError, interpret_data, open_socket, read_data, read_header,
+    write_request,
 };
 
 /// Look up a host name, synchronously.
@@ -39,9 +40,13 @@ fn do_lookup<'a>(
 
     let mut io = IoState::default();
     loop {
-        await_writable(&sock, deadline)?;
-        if write_request(sock.as_fd(), &mut io, host)?.is_break() {
-            break;
+        match write_request(sock.as_fd(), &mut io, host) {
+            Ok(ControlFlow::Continue(())) => continue,
+            Ok(ControlFlow::Break(())) => break,
+            Err(RequestError::Write(WriteError(Some(Errno::AGAIN)))) => {
+                await_writable(&sock, deadline)?;
+            }
+            Err(err) => return Err(Error::Request(err)),
         }
     }
 
@@ -49,19 +54,27 @@ fn do_lookup<'a>(
     let mut resp = AiResponseHeader::default();
     let data_len = loop {
         await_readable(&sock, deadline)?;
-        match read_header(sock.as_fd(), &mut io, &mut resp)? {
-            ControlFlow::Continue(()) => continue,
-            ControlFlow::Break(IsEmpty::Empty) => return Ok(None),
-            ControlFlow::Break(IsEmpty::HasData(data_len)) => break data_len,
+        match read_header(sock.as_fd(), &mut io, &mut resp) {
+            Ok(ControlFlow::Continue(())) => continue,
+            Ok(ControlFlow::Break(IsEmpty::Empty)) => return Ok(None),
+            Ok(ControlFlow::Break(IsEmpty::HasData(data_len))) => break data_len,
+            Err(HeaderError::Read(ReadError(Some(Errno::AGAIN)))) => {
+                await_readable(&sock, deadline)?;
+            }
+            Err(err) => return Err(Error::Header(err)),
         }
     };
     buf.resize(data_len, 0);
 
     io = IoState::default();
     loop {
-        await_readable(&sock, deadline)?;
-        if read_data(sock.as_fd(), &mut io, buf)?.is_break() {
-            break;
+        match read_data(sock.as_fd(), &mut io, buf) {
+            Ok(ControlFlow::Continue(())) => continue,
+            Ok(ControlFlow::Break(())) => break,
+            Err(DataError::Read(ReadError(Some(Errno::AGAIN)))) => {
+                await_readable(&sock, deadline)?;
+            }
+            Err(err) => return Err(Error::Data(err)),
         }
     }
 
@@ -69,37 +82,31 @@ fn do_lookup<'a>(
 }
 
 fn await_writable(sock: &OwnedFd, deadline: Instant) -> Result<(), Error> {
-    let Some(remaining) = deadline.checked_duration_since(Instant::now()) else {
-        return Err(Error::Timeout(None));
-    };
-
-    let timeout = Timespec::try_from(remaining).map_err(|_| Error::Timeout(None))?;
     let events = PollFlags::IN
         | PollFlags::OUT
         | PollFlags::WRNORM
         | PollFlags::WRBAND
         | PollFlags::ERR
         | PollFlags::HUP;
-    let mut fds = [PollFd::new(sock, events)];
-    if poll(&mut fds, Some(&timeout)).map_err(|err| Error::Timeout(Some(err)))? == 0 {
-        return Err(Error::Timeout(None));
-    }
-
-    Ok(())
+    await_io(sock, deadline, events)
 }
 
 fn await_readable(sock: &OwnedFd, deadline: Instant) -> Result<(), Error> {
-    let Some(remaining) = deadline.checked_duration_since(Instant::now()) else {
-        return Err(Error::Timeout(None));
-    };
-
-    let timeout = Timespec::try_from(remaining).map_err(|_| Error::Timeout(None))?;
     let events = PollFlags::IN
         | PollFlags::PRI
         | PollFlags::RDNORM
         | PollFlags::RDBAND
         | PollFlags::ERR
         | PollFlags::HUP;
+    await_io(sock, deadline, events)
+}
+
+fn await_io(sock: &OwnedFd, deadline: Instant, events: PollFlags) -> Result<(), Error> {
+    let Some(remaining) = deadline.checked_duration_since(Instant::now()) else {
+        return Err(Error::Timeout(None));
+    };
+
+    let timeout = Timespec::try_from(remaining).map_err(|_| Error::Timeout(None))?;
     let mut fds = [PollFd::new(sock, events)];
     if poll(&mut fds, Some(&timeout)).map_err(|err| Error::Timeout(Some(err)))? == 0 {
         return Err(Error::Timeout(None));

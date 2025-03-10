@@ -17,7 +17,7 @@ pub(crate) fn open_socket() -> Result<OwnedFd, SocketError> {
     let sock = socket_with(
         AddressFamily::UNIX,
         SocketType::STREAM,
-        SocketFlags::CLOEXEC,
+        SocketFlags::CLOEXEC | SocketFlags::NONBLOCK,
         None,
     )
     .map_err(SocketError::Open)?;
@@ -46,10 +46,14 @@ pub(crate) fn write_request(
     let req = RequestHeader {
         version: NSCD_VERSION,
         r#type: GETAI,
-        key_len: host.len().try_into().unwrap(),
+        key_len: (host.len() + 1).try_into().unwrap(),
     };
 
-    let mut slices = [IoSlice::new(bytes_of(&req)), IoSlice::new(host)];
+    let mut slices = [
+        IoSlice::new(bytes_of(&req)),
+        IoSlice::new(host),
+        IoSlice::new(&[0]),
+    ];
     write_all(sock, io, &mut slices).map_err(RequestError::Write)
 }
 
