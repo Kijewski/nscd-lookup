@@ -8,9 +8,8 @@ use rustix::event::{PollFd, PollFlags, Timespec, poll};
 use rustix::io::Errno;
 
 use crate::protocol::{
-    AiResponseHeader, DataError, HeaderError, IoState, IpAddrIterator, IsEmpty, ReadError,
-    RequestError, SocketError, WriteError, interpret_data, open_socket, read_data, read_header,
-    write_request,
+    AiResponseHeader, DataError, HeaderError, IoState, IpAddrIterator, IsEmpty, IsWouldblock,
+    RequestError, SocketError, interpret_data, open_socket, read_data, read_header, write_request,
 };
 
 /// Look up a host name, synchronously.
@@ -43,9 +42,7 @@ fn do_lookup<'a>(
         match write_request(sock.as_fd(), &mut io, host) {
             Ok(ControlFlow::Continue(())) => continue,
             Ok(ControlFlow::Break(())) => break,
-            Err(RequestError::Write(WriteError(Some(Errno::AGAIN)))) => {
-                await_writable(&sock, deadline)?;
-            }
+            Err(err) if err.is_wouldblock() => await_writable(&sock, deadline)?,
             Err(err) => return Err(Error::Request(err)),
         }
     }
@@ -58,9 +55,7 @@ fn do_lookup<'a>(
             Ok(ControlFlow::Continue(())) => continue,
             Ok(ControlFlow::Break(IsEmpty::Empty)) => return Ok(None),
             Ok(ControlFlow::Break(IsEmpty::HasData(data_len))) => break data_len,
-            Err(HeaderError::Read(ReadError(Some(Errno::AGAIN)))) => {
-                await_readable(&sock, deadline)?;
-            }
+            Err(err) if err.is_wouldblock() => await_readable(&sock, deadline)?,
             Err(err) => return Err(Error::Header(err)),
         }
     };
@@ -71,9 +66,7 @@ fn do_lookup<'a>(
         match read_data(sock.as_fd(), &mut io, buf) {
             Ok(ControlFlow::Continue(())) => continue,
             Ok(ControlFlow::Break(())) => break,
-            Err(DataError::Read(ReadError(Some(Errno::AGAIN)))) => {
-                await_readable(&sock, deadline)?;
-            }
+            Err(err) if err.is_wouldblock() => await_readable(&sock, deadline)?,
             Err(err) => return Err(Error::Data(err)),
         }
     }

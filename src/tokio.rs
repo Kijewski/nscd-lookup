@@ -11,8 +11,8 @@ use tokio::io::Interest;
 use tokio::io::unix::AsyncFd;
 
 use crate::protocol::{
-    AiResponseHeader, DataError, HeaderError, IoState, IpAddrIterator, IsEmpty, ReadError,
-    RequestError, WriteError, interpret_data, open_socket, read_data, read_header, write_request,
+    AiResponseHeader, IoState, IpAddrIterator, IsEmpty, IsWouldblock, interpret_data, open_socket,
+    read_data, read_header, write_request,
 };
 pub use crate::sync::DEFAULT_TIMEOUT;
 use crate::sync::Error as SyncError;
@@ -142,75 +142,4 @@ pub enum Error {
     /// Could not wait for socket to become readable
     #[error("Could not wait for socket to become readable")]
     Readable(#[source] std::io::Error),
-}
-
-trait IsWouldblock {
-    fn is_wouldblock(&self) -> bool;
-}
-
-impl<T: IsWouldblock> IsWouldblock for &T {
-    #[inline]
-    fn is_wouldblock(&self) -> bool {
-        <T as IsWouldblock>::is_wouldblock(self)
-    }
-}
-
-impl<T: IsWouldblock> IsWouldblock for Option<T> {
-    #[inline]
-    fn is_wouldblock(&self) -> bool {
-        match self {
-            Some(err) => err.is_wouldblock(),
-            None => false,
-        }
-    }
-}
-
-impl IsWouldblock for RequestError {
-    #[inline]
-    fn is_wouldblock(&self) -> bool {
-        match self {
-            RequestError::Write(err) => err.is_wouldblock(),
-        }
-    }
-}
-
-impl IsWouldblock for HeaderError {
-    #[inline]
-    fn is_wouldblock(&self) -> bool {
-        match self {
-            HeaderError::Read(err) => err.is_wouldblock(),
-            HeaderError::Version(_) | HeaderError::Data | HeaderError::TooBig => false,
-        }
-    }
-}
-
-impl IsWouldblock for DataError {
-    #[inline]
-    fn is_wouldblock(&self) -> bool {
-        match self {
-            DataError::Read(err) => err.is_wouldblock(),
-            DataError::Canon | DataError::Family | DataError::DataLength { .. } => false,
-        }
-    }
-}
-
-impl IsWouldblock for WriteError {
-    #[inline]
-    fn is_wouldblock(&self) -> bool {
-        self.0.is_wouldblock()
-    }
-}
-
-impl IsWouldblock for ReadError {
-    #[inline]
-    fn is_wouldblock(&self) -> bool {
-        self.0.is_wouldblock()
-    }
-}
-
-impl IsWouldblock for Errno {
-    #[inline]
-    fn is_wouldblock(&self) -> bool {
-        matches!(*self, Errno::WOULDBLOCK)
-    }
 }

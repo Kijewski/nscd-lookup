@@ -326,6 +326,77 @@ fn read_all(
 /// Could not read data from socket
 pub struct ReadError(#[source] pub Option<Errno>);
 
+pub(crate) trait IsWouldblock {
+    fn is_wouldblock(&self) -> bool;
+}
+
+impl<T: IsWouldblock> IsWouldblock for &T {
+    #[inline]
+    fn is_wouldblock(&self) -> bool {
+        <T as IsWouldblock>::is_wouldblock(self)
+    }
+}
+
+impl<T: IsWouldblock> IsWouldblock for Option<T> {
+    #[inline]
+    fn is_wouldblock(&self) -> bool {
+        match self {
+            Some(err) => err.is_wouldblock(),
+            None => false,
+        }
+    }
+}
+
+impl IsWouldblock for RequestError {
+    #[inline]
+    fn is_wouldblock(&self) -> bool {
+        match self {
+            RequestError::Write(err) => err.is_wouldblock(),
+        }
+    }
+}
+
+impl IsWouldblock for HeaderError {
+    #[inline]
+    fn is_wouldblock(&self) -> bool {
+        match self {
+            HeaderError::Read(err) => err.is_wouldblock(),
+            HeaderError::Version(_) | HeaderError::Data | HeaderError::TooBig => false,
+        }
+    }
+}
+
+impl IsWouldblock for DataError {
+    #[inline]
+    fn is_wouldblock(&self) -> bool {
+        match self {
+            DataError::Read(err) => err.is_wouldblock(),
+            DataError::Canon | DataError::Family | DataError::DataLength { .. } => false,
+        }
+    }
+}
+
+impl IsWouldblock for WriteError {
+    #[inline]
+    fn is_wouldblock(&self) -> bool {
+        self.0.is_wouldblock()
+    }
+}
+
+impl IsWouldblock for ReadError {
+    #[inline]
+    fn is_wouldblock(&self) -> bool {
+        self.0.is_wouldblock()
+    }
+}
+
+impl IsWouldblock for Errno {
+    #[inline]
+    fn is_wouldblock(&self) -> bool {
+        *self == Errno::WOULDBLOCK
+    }
+}
+
 #[derive(Debug, Clone, Copy, Default)]
 pub(crate) struct IoState {
     pos: usize,
